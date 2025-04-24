@@ -1,23 +1,35 @@
-
 "use client";
 
 import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
+import { format, isSameDay } from "date-fns";
 import { CalendarIcon, PlusCircle } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis
+} from "recharts";
 
 interface Expense {
   id: string;
   description: string;
   amount: number;
   date: Date;
+  category: string;
 }
 
 const translations = {
@@ -25,20 +37,40 @@ const translations = {
   descriptionLabel: "Тайлбар",
   amountLabel: "Дүн",
   dateLabel: "Огноо",
+  categoryLabel: "Ангилал",
   addExpense: "Зардал нэмэх",
   expenseList: "Зардлын жагсаалт",
   noExpenses: "Зардал байхгүй",
+  total: "Нийт",
+  sortBy: "Эрэмбэлэх",
+  highestAmount: "Хамгийн өндөр дүнгээр",
+  lowestAmount: "Хамгийн бага дүнгээр",
+  newestDate: "Хамгийн сүүлд",
+  oldestDate: "Хамгийн эхэнд",
+  dashboardTitle: "Зардлын Дашбоард",
 };
+
+const categories = [
+  "Хүнс",
+  "Тээвэр",
+  "Орон сууц",
+  "Харилга",
+  "Эрүүл мэнд",
+  "Боловсрол",
+  "Бусад",
+];
 
 export default function Home() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState<number | undefined>(undefined);
   const [date, setDate] = useState<Date | undefined>(undefined);
+  const [category, setCategory] = useState(categories[0]); // Default category
+  const [sortBy, setSortBy] = useState("newestDate");
 
   const addExpense = () => {
-    if (!description || !amount || !date) {
-      alert("Тайлбар, дүн, огноог оруулна уу."); // Please enter description, amount and date
+    if (!description || !amount || !date || !category) {
+      alert("Тайлбар, дүн, огноо, ангилалыг оруулна уу."); // Please enter description, amount, date and category
       return;
     }
 
@@ -47,13 +79,51 @@ export default function Home() {
       description,
       amount,
       date,
+      category,
     };
 
     setExpenses([...expenses, newExpense]);
     setDescription("");
     setAmount(undefined);
     setDate(undefined);
+    setCategory(categories[0]); // Reset to default category
   };
+
+  const sortedExpenses = [...expenses].sort((a, b) => {
+    switch (sortBy) {
+      case "highestAmount":
+        return b.amount - a.amount;
+      case "lowestAmount":
+        return a.amount - b.amount;
+      case "newestDate":
+        return b.date.getTime() - a.date.getTime();
+      case "oldestDate":
+        return a.date.getTime() - b.date.getTime();
+      default:
+        return 0;
+    }
+  });
+
+  const groupedExpenses = sortedExpenses.reduce((acc: { [key: string]: Expense[] }, expense) => {
+    const dateKey = format(expense.date, "PPP");
+    if (!acc[dateKey]) {
+      acc[dateKey] = [];
+    }
+    acc[dateKey].push(expense);
+    return acc;
+  }, {});
+
+  const categoryTotals = expenses.reduce((acc: { [key: string]: number }, expense) => {
+    acc[expense.category] = (acc[expense.category] || 0) + expense.amount;
+    return acc;
+  }, {});
+
+  const totalExpense = expenses.reduce((acc: number, expense) => acc + expense.amount, 0);
+
+  const chartData = Object.entries(categoryTotals).map(([category, total]) => ({
+    name: category,
+    total,
+  }));
 
   return (
     <div className="flex flex-col items-center justify-start min-h-screen bg-secondary py-12">
@@ -109,6 +179,21 @@ export default function Home() {
               </PopoverContent>
             </Popover>
           </div>
+          <div className="grid gap-2">
+            <Label htmlFor="category">{translations.categoryLabel}</Label>
+            <Select onValueChange={setCategory} defaultValue={category}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder={translations.categoryLabel} />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((cat) => (
+                  <SelectItem key={cat} value={cat}>
+                    {cat}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <Button onClick={addExpense} className="w-full bg-primary text-primary-foreground hover:bg-primary/80">
             <PlusCircle className="mr-2 h-4 w-4" />
             {translations.addExpense}
@@ -117,24 +202,69 @@ export default function Home() {
       </Card>
 
       <Card className="w-full max-w-md mt-8 p-4">
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>{translations.expenseList}</CardTitle>
+          <Select onValueChange={setSortBy} defaultValue={sortBy}>
+            <SelectTrigger>
+              <SelectValue placeholder={translations.sortBy} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="highestAmount">{translations.highestAmount}</SelectItem>
+              <SelectItem value="lowestAmount">{translations.lowestAmount}</SelectItem>
+              <SelectItem value="newestDate">{translations.newestDate}</SelectItem>
+              <SelectItem value="oldestDate">{translations.oldestDate}</SelectItem>
+            </SelectContent>
+          </Select>
         </CardHeader>
         <CardContent>
-          {expenses.length > 0 ? (
-            <ul className="space-y-2">
-              {expenses.map((expense) => (
-                <li key={expense.id} className="border rounded-md p-2">
-                  <div className="font-bold">{expense.description}</div>
-                  <div>{expense.amount}₮ - {format(expense.date, "PPP")}</div>
-                </li>
-              ))}
-            </ul>
+          {Object.keys(groupedExpenses).length > 0 ? (
+            Object.entries(groupedExpenses).map(([date, dailyExpenses]) => (
+              <div key={date} className="mb-4">
+                <h3 className="font-semibold text-lg">{date}</h3>
+                <ul className="space-y-2">
+                  {dailyExpenses.map((expense) => (
+                    <li key={expense.id} className="border rounded-md p-2">
+                      <div className="flex justify-between">
+                        <div className="font-bold">{expense.description}</div>
+                        <div>{expense.amount}₮</div>
+                      </div>
+                      <div className="text-sm text-muted-foreground">{expense.category}</div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))
           ) : (
             <div>{translations.noExpenses}</div>
           )}
+          {expenses.length > 0 && (
+            <>
+              <Separator className="my-4" />
+              <div className="font-bold">{translations.total}: {totalExpense}₮</div>
+            </>
+          )}
         </CardContent>
       </Card>
+
+      {expenses.length > 0 && (
+        <Card className="w-full max-w-md mt-8 p-4">
+          <CardHeader>
+            <CardTitle>{translations.dashboardTitle}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="total" fill="#82ca9d" />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
