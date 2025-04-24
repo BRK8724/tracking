@@ -8,21 +8,23 @@ import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { format, isSameDay } from "date-fns";
+import { format } from "date-fns";
 import { CalendarIcon, PlusCircle } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
+  PieChart,
+  Pie,
+  Cell,
   ResponsiveContainer,
   Tooltip,
-  XAxis,
-  YAxis
+  Legend,
 } from "recharts";
+import { registerLocale } from 'date-fns';
+import mn from 'date-fns/locale/mn';
+
+registerLocale('mn', mn);
 
 interface Expense {
   id: string;
@@ -59,6 +61,8 @@ const categories = [
   "Боловсрол",
   "Бусад",
 ];
+
+const COLORS = ["#82ca9d", "#8884d8", "#a4de6c", "#d0ed57", "#8dd1e1", "#82ca9d", "#a4de6c"];
 
 export default function Home() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -105,7 +109,7 @@ export default function Home() {
   });
 
   const groupedExpenses = sortedExpenses.reduce((acc: { [key: string]: Expense[] }, expense) => {
-    const dateKey = format(expense.date, "PPP");
+    const dateKey = format(expense.date, "PPP", {locale: 'mn'});
     if (!acc[dateKey]) {
       acc[dateKey] = [];
     }
@@ -122,11 +126,11 @@ export default function Home() {
 
   const chartData = Object.entries(categoryTotals).map(([category, total]) => ({
     name: category,
-    total,
+    value: total,
   }));
 
   return (
-    <div className="flex flex-col items-center justify-start min-h-screen bg-secondary py-12">
+    <div className="flex flex-col items-center justify-start min-h-screen bg-secondary py-12 px-4 md:px-0">
       <Card className="w-full max-w-md space-y-4 p-4">
         <CardHeader>
           <CardTitle>{translations.title}</CardTitle>
@@ -163,7 +167,7 @@ export default function Home() {
                   )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {date ? format(date, "PPP") : <span>{translations.dateLabel}</span>}
+                  {date ? format(date, "PPP", {locale: 'mn'}) : <span>{translations.dateLabel}</span>}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
@@ -253,14 +257,24 @@ export default function Home() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
+              <PieChart>
+                <Pie
+                  dataKey="value"
+                  isAnimationActive={false}
+                  data={chartData}
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={80}
+                  fill="#8884d8"
+                  label
+                >
+                  {chartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="total" fill="#82ca9d" />
-              </BarChart>
+              </PieChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
