@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,8 @@ import {
   Legend,
 } from "recharts";
 import mn from 'date-fns/locale/mn';
+import { addDoc, collection, getDocs, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 
 interface Expense {
@@ -70,25 +72,65 @@ export default function Home() {
   const [category, setCategory] = useState(categories[0]); // Default category
   const [sortBy, setSortBy] = useState("newestDate");
 
-  const addExpense = () => {
+  useEffect(() => {
+    const fetchExpenses = async () => {
+      const expensesCollection = collection(db, 'expenses');
+      const q = query(expensesCollection, orderBy('date', 'desc'));
+      const expensesSnapshot = await getDocs(q);
+      const expensesList = expensesSnapshot.docs.map(doc => ({
+        id: doc.id,
+        description: doc.data().description,
+        amount: doc.data().amount,
+        date: doc.data().date.toDate(),
+        category: doc.data().category,
+      }));
+      setExpenses(expensesList);
+    };
+
+    fetchExpenses();
+  }, []);
+
+
+  const addExpense = async () => {
     if (!description || !amount || !date || !category) {
       alert("Тайлбар, дүн, огноо, ангилалыг оруулна уу."); // Please enter description, amount, date and category
       return;
     }
 
-    const newExpense: Expense = {
-      id: crypto.randomUUID(),
+    const newExpense = {
       description,
       amount,
       date,
       category,
     };
 
-    setExpenses([...expenses, newExpense]);
-    setDescription("");
-    setAmount(undefined);
-    setDate(undefined);
-    setCategory(categories[0]); // Reset to default category
+    try {
+      const expensesCollection = collection(db, 'expenses');
+      await addDoc(expensesCollection, {
+        description,
+        amount,
+        date: date,
+        category,
+      });
+      setDescription("");
+      setAmount(undefined);
+      setDate(undefined);
+      setCategory(categories[0]);
+      // Fetch expenses again to update the list
+      const expensesCollectionNew = collection(db, 'expenses');
+      const q = query(expensesCollectionNew, orderBy('date', 'desc'));
+      const expensesSnapshot = await getDocs(q);
+      const expensesList = expensesSnapshot.docs.map(doc => ({
+        id: doc.id,
+        description: doc.data().description,
+        amount: doc.data().amount,
+        date: doc.data().date.toDate(),
+        category: doc.data().category,
+      }));
+      setExpenses(expensesList);
+    } catch (error) {
+      console.error("Error adding expense:", error);
+    }
   };
 
   const sortedExpenses = [...expenses].sort((a, b) => {
