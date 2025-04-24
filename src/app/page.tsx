@@ -21,10 +21,8 @@ import {
   Tooltip,
   Legend,
 } from "recharts";
-import { registerLocale } from 'date-fns';
 import mn from 'date-fns/locale/mn';
 
-registerLocale('mn', mn);
 
 interface Expense {
   id: string;
@@ -109,7 +107,7 @@ export default function Home() {
   });
 
   const groupedExpenses = sortedExpenses.reduce((acc: { [key: string]: Expense[] }, expense) => {
-    const dateKey = format(expense.date, "PPP", {locale: 'mn'});
+    const dateKey = format(expense.date, "PPP", {locale: mn});
     if (!acc[dateKey]) {
       acc[dateKey] = [];
     }
@@ -167,7 +165,7 @@ export default function Home() {
                   )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {date ? format(date, "PPP", {locale: 'mn'}) : <span>{translations.dateLabel}</span>}
+                  {date ? format(date, "PPP", {locale: mn}) : <span>{translations.dateLabel}</span>}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
